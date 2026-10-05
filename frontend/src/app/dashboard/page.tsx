@@ -185,7 +185,7 @@ export default function Dashboard() {
 
       {/* Main */}
       <main className="flex-1 pt-16 flex items-start justify-center" style={{ minHeight: "calc(100vh - 4rem)" }}>
-        <div className="flex w-full max-w-5xl gap-5 p-4 pt-8 items-start">
+        <div className="flex flex-col md:flex-row w-full max-w-5xl gap-5 p-4 pt-8 items-start">
 
           {/* MAIN CARD */}
           <div className="flex-1 rounded-xl relative overflow-hidden transition-all duration-300" style={{ background: "rgba(10,14,24,0.8)", backdropFilter: "blur(20px)", border: "1px solid rgba(0,243,255,0.2)", boxShadow: "0 0 50px rgba(0,243,255,0.08), inset 0 1px 1px rgba(255,255,255,0.06)" }}>
@@ -414,7 +414,7 @@ export default function Dashboard() {
           </div>
 
           {/* HISTORY SIDEBAR */}
-          <div className="w-64 shrink-0 rounded-xl p-5 max-h-[600px] overflow-y-auto" style={{ background: "rgba(10,14,24,0.8)", backdropFilter: "blur(20px)", border: "1px solid rgba(0,243,255,0.15)" }}>
+          <div className="w-full md:w-64 shrink-0 rounded-xl p-5 max-h-[600px] overflow-y-auto" style={{ background: "rgba(10,14,24,0.8)", backdropFilter: "blur(20px)", border: "1px solid rgba(0,243,255,0.15)" }}>
             <div className="flex items-center gap-2 mb-4">
               <svg className="w-4 h-4" style={{ color: "#00f3ff" }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <h2 className="font-bold text-sm uppercase tracking-wider font-mono" style={{ color: "#e0e2f1" }}>Vault Log</h2>
