@@ -9,6 +9,9 @@ import app.models as models
 import app.auth as auth
 from app.database import engine, get_db
 import io
+import secrets
+import datetime
+from pydantic import BaseModel, EmailStr
 
 # Create the database tables
 models.Base.metadata.create_all(bind=engine)
@@ -68,6 +71,73 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     
     access_token = auth.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+
+# --- PASSWORD RESET ROUTES ---
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+@app.post("/forgot-password")
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    # Invalidate any existing tokens for this user
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.user_id == user.id,
+        models.PasswordResetToken.used == False
+    ).update({"used": True})
+
+    # Create a new reset token (expires in 1 hour)
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+    reset_token = models.PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=expires_at
+    )
+    db.add(reset_token)
+    db.commit()
+
+    # In production, send this via email. For now, return it in the response.
+    # TODO: Integrate with an email provider (SendGrid, SES, etc.)
+    reset_link = f"{token}"
+    return {
+        "message": "If that email exists, a reset link has been sent.",
+        "reset_token": token  # Remove this in production — send via email only!
+    }
+
+@app.post("/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == request.token,
+        models.PasswordResetToken.used == False
+    ).first()
+
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+    if datetime.datetime.utcnow() > reset_token.expires_at:
+        reset_token.used = True
+        db.commit()
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+
+    # Update the user's password
+    user = db.query(models.User).filter(models.User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.password_hash = auth.get_password_hash(request.new_password)
+    reset_token.used = True
+    db.commit()
+
+    return {"message": "Password reset successfully. You can now log in with your new password."}
 
 # --- ENCRYPTION ROUTES ---
 

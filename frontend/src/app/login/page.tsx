@@ -8,8 +8,14 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetStep, setResetStep] = useState<"request" | "reset">("request");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [state, setState] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [errorMsg, setErrorMsg] = useState("Please check your email and password and try again.");
+  const [successMsg, setSuccessMsg] = useState("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const router = useRouter();
 
@@ -97,6 +103,52 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState("loading");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/forgot-password`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (!response.ok) throw new Error("Request failed");
+      const data = await response.json();
+      // If backend returns a reset_token (dev mode), auto-fill it
+      if (data.reset_token) setResetToken(data.reset_token);
+      setState("success");
+      setSuccessMsg("Reset token generated! Enter it below along with your new password.");
+      setTimeout(() => { setState("idle"); setResetStep("reset"); }, 1500);
+    } catch {
+      setErrorMsg("Failed to send reset link. Please try again.");
+      setState("error");
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState("loading");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resetToken, new_password: newPassword })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        setErrorMsg(err?.detail || "Reset failed. Token may be invalid or expired.");
+        setState("error");
+        return;
+      }
+      setState("success");
+      setSuccessMsg("Password reset! Redirecting to login...");
+      setTimeout(() => { setIsForgotPassword(false); setResetStep("request"); setResetToken(""); setNewPassword(""); setState("idle"); }, 2000);
+    } catch {
+      setErrorMsg("Cannot reach the server. Is the backend running?");
+      setState("error");
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-x-hidden flex flex-col justify-between selection:text-black"
       style={{ background: "#07090e", color: "#f1f5f9", fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -167,8 +219,8 @@ export default function Login() {
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-1">SecureFile</h1>
               <p className="text-xs font-mono mb-3" style={{ color: "rgba(0,240,255,0.9)", letterSpacing: "0.1em" }}>Secure your files. Protect your data.</p>
               <div className="pt-3" style={{ borderTop: "1px solid rgba(30,41,59,0.8)" }}>
-                <h2 className="text-base font-bold text-slate-100">Welcome Back</h2>
-                <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>Sign in to continue to SecureFile</p>
+                <h2 className="text-base font-bold text-slate-100">{isForgotPassword ? "Reset Password" : "Welcome Back"}</h2>
+                <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{isForgotPassword ? "Enter your email to receive a reset link" : "Sign in to continue to SecureFile"}</p>
               </div>
             </div>
 
@@ -195,14 +247,98 @@ export default function Login() {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold" style={{ color: "#d1fae5" }}>Identity Authenticated</h4>
-                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "rgba(209,250,229,0.9)" }}>Session key derived. Redirecting to vault...</p>
+                  <h4 className="text-xs font-bold" style={{ color: "#d1fae5" }}>{isForgotPassword ? "Reset Link Sent" : "Identity Authenticated"}</h4>
+                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "rgba(209,250,229,0.9)" }}>
+                    {isForgotPassword ? successMsg || "Check your email for the reset link." : "Session key derived. Redirecting to vault..."}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Form */}
-            <form onSubmit={handleLogin} className="space-y-4">
+            {isForgotPassword ? (
+              resetStep === "request" ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                {/* Email */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-semibold" style={{ color: "#cbd5e1" }}>Email</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none" style={{ color: "#64748b" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
+                    </div>
+                    <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                      style={{ background: "rgba(9,13,20,0.85)", border: "1px solid rgba(255,255,255,0.08)", color: "#f1f5f9" }}
+                      onFocus={e => { e.target.style.borderColor = "#00f0ff"; e.target.style.boxShadow = "0 0 0 3px rgba(0,240,255,0.16), 0 0 20px rgba(0,240,255,0.15)"; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
+                    />
+                  </div>
+                </div>
+                {/* Submit Button */}
+                <div className="pt-2">
+                  <button type="submit" disabled={state === "loading" || state === "success"}
+                    className="w-full relative overflow-hidden py-3 px-4 rounded-xl font-bold text-sm transition-all"
+                    style={{ background: "linear-gradient(to right, #00f0ff, #67e8f9, #0072ff)", color: "#07090e", boxShadow: "0 0 20px rgba(0,240,255,0.4)" }}>
+                    {state === "loading"
+                      ? <span className="flex items-center justify-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg><span>Sending...</span></span>
+                      : <span className="font-bold tracking-wide">Send Reset Token</span>
+                    }
+                  </button>
+                </div>
+              </form>
+              ) : (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                {/* Reset Token */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-semibold" style={{ color: "#cbd5e1" }}>Reset Token</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none" style={{ color: "#64748b" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                    </div>
+                    <input type="text" required value={resetToken} onChange={e => setResetToken(e.target.value)} placeholder="Paste your reset token"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl focus:outline-none transition-all font-mono"
+                      style={{ background: "rgba(9,13,20,0.85)", border: "1px solid rgba(255,255,255,0.08)", color: "#f1f5f9" }}
+                      onFocus={e => { e.target.style.borderColor = "#00f0ff"; e.target.style.boxShadow = "0 0 0 3px rgba(0,240,255,0.16)"; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
+                    />
+                  </div>
+                </div>
+                {/* New Password */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-semibold" style={{ color: "#cbd5e1" }}>New Password</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none" style={{ color: "#64748b" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    </div>
+                    <input type={showNewPassword ? "text" : "password"} required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password"
+                      className="w-full pl-10 pr-11 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                      style={{ background: "rgba(9,13,20,0.85)", border: "1px solid rgba(255,255,255,0.08)", color: "#f1f5f9" }}
+                      onFocus={e => { e.target.style.borderColor = "#00f0ff"; e.target.style.boxShadow = "0 0 0 3px rgba(0,240,255,0.16)"; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
+                    />
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center" style={{ color: "#64748b" }}>
+                      {showNewPassword
+                        ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                        : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                      }
+                    </button>
+                  </div>
+                </div>
+                {/* Submit Button */}
+                <div className="pt-2">
+                  <button type="submit" disabled={state === "loading" || state === "success"}
+                    className="w-full relative overflow-hidden py-3 px-4 rounded-xl font-bold text-sm transition-all"
+                    style={{ background: "linear-gradient(to right, #00f0ff, #67e8f9, #0072ff)", color: "#07090e", boxShadow: "0 0 20px rgba(0,240,255,0.4)" }}>
+                    {state === "loading"
+                      ? <span className="flex items-center justify-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg><span>Resetting...</span></span>
+                      : <span className="font-bold tracking-wide">Reset Password</span>
+                    }
+                  </button>
+                </div>
+              </form>
+              )
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-4">
               {/* Email */}
               <div className="space-y-1.5 text-left">
                 <label className="block text-xs font-semibold" style={{ color: "#cbd5e1" }}>Email</label>
@@ -223,7 +359,7 @@ export default function Login() {
               <div className="space-y-1.5 text-left">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-semibold" style={{ color: "#cbd5e1" }}>Password</label>
-                  <Link href="/register" className="text-[11px] font-mono" style={{ color: "#67e8f9" }}>No account? Register</Link>
+                  <button type="button" onClick={() => { setIsForgotPassword(true); setState("idle"); }} className="text-[11px] font-mono hover:underline" style={{ color: "#67e8f9" }}>Forgot password?</button>
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none" style={{ color: "#64748b" }}>
@@ -262,10 +398,18 @@ export default function Login() {
                 </button>
               </div>
             </form>
+            )}
 
+            {/* Bottom Form Actions */}
             <div className="mt-5 text-center text-xs" style={{ color: "#94a3b8" }}>
-              Don't have an account?{" "}
-              <Link href="/register" className="font-semibold hover:underline" style={{ color: "#67e8f9" }}>Create one</Link>
+              {isForgotPassword ? (
+                <button type="button" onClick={() => { setIsForgotPassword(false); setState("idle"); }} className="font-semibold hover:underline" style={{ color: "#67e8f9" }}>Back to Login</button>
+              ) : (
+                <>
+                  Don't have an account?{" "}
+                  <Link href="/register" className="font-semibold hover:underline" style={{ color: "#67e8f9" }}>Create one</Link>
+                </>
+              )}
             </div>
 
             {/* Bottom security badge */}

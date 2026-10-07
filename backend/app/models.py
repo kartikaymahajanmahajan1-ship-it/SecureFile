@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from app.database import Base
 import datetime
 
@@ -18,4 +18,14 @@ class FileHistory(Base):
     file_name = Column(String)
     operation = Column(String) # ENCRYPT or DECRYPT
     status = Column(String)    # SUCCESS or FAILED
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    token = Column(String, unique=True, index=True)
+    used = Column(Boolean, default=False)
+    expires_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

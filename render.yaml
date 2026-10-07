@@ -8,6 +8,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
+      - key: DATABASE_URL
+        value: sqlite:///./data/securefile.db
     disk:
       name: sqlite-data
       mountPath: /opt/render/project/src/backend/data

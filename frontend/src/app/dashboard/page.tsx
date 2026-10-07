@@ -434,7 +434,7 @@ export default function Dashboard() {
                         {h.status}
                       </span>
                     </div>
-                    <p className="text-[10px] font-mono mt-1" style={{ color: "#3a494b" }}>{new Date(h.created_at).toLocaleString()}</p>
+                    <p className="text-[10px] font-mono mt-1" style={{ color: "#3a494b" }}>{new Date(h.created_at + (!h.created_at.endsWith("Z") ? "Z" : "")).toLocaleString()}</p>
                   </div>
                 ))}
               </div>
